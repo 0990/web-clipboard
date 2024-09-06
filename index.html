@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clipboard</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        .message {
+            font-size: 24px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+<div class="message">Ctrl+V or Drop file</div>
+<script>
+    window.addEventListener('dragover', (event) => {
+        event.preventDefault();
+    });
+
+    window.addEventListener('drop', (event) => {
+        event.preventDefault();
+        const files = event.dataTransfer.files;
+        uploadFile(files[0]);
+    });
+
+    function getUrlPath(){
+        const url = window.location.href;
+        const urlObj = new URL(url);
+        return urlObj.pathname;
+    }
+
+    function uploadFile(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('opt', "upload_file");
+
+        fetch(getUrlPath(), {
+            method: 'POST',
+            body: formData
+        }).then(response => response.text())
+            .then(result => location.reload())
+            .catch(error => alert('Upload failed'));
+    }
+
+    function uploadString(string) {
+        const formData = new FormData();
+        formData.append('string', string);
+        formData.append('opt', "upload_string");
+
+        fetch(getUrlPath(), {
+            method: 'POST',
+            body: formData
+        }).then(response => response.text())
+            .then(result => {
+                location.reload();
+            })
+            .catch(error => alert('Upload failed'));
+    }
+
+    // Handle paste events
+    window.addEventListener('paste', (event) => {
+        const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+        if(items.length>0){
+            const item = items[0];
+            if (item.kind === 'file') {
+                const file = item.getAsFile();
+                uploadFile(file);
+            } else if(item.kind == 'string'){
+                item.getAsString((string) => {
+                    uploadString(string);
+                });
+            }
+        }
+    });
+</script>
+</body>
+</html>

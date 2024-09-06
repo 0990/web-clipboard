@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clipboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .container { max-width: 1200px; margin: auto; }
+        .buttons { margin-bottom: 20px; }
+        .buttons button {
+            font-size: 18px;
+            padding: 10px 20px;
+            margin-right: 10px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: white;
+        }
+        .buttons button:hover {
+            background-color: #0056b3;
+        }
+        pre {
+            font-size: 16px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+    </style>
+    <script>
+        function getUrlPath(){
+            const url = window.location.href;
+            const urlObj = new URL(url);
+            return urlObj.pathname;
+        }
+
+        function deleteFile(filename) {
+            const formData = new FormData();
+            formData.append('filename', filename);
+            formData.append('opt', "delete_file");
+
+            fetch(getUrlPath(), {
+                method: 'POST',
+                body: formData
+            }).then(response => response.text())
+                .then(result => {
+                    location.reload();
+                })
+                .catch(error => alert('delete failed'));
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            const fileName = document.getElementById('fileName').getAttribute('data-file');
+            const fileContent = document.getElementById('fileContent').textContent;
+
+            document.getElementById('deleteBtn').onclick = function() {
+                deleteFile(fileName)
+            };
+
+            document.getElementById('downloadBtn').onclick = function() {
+                window.location.href = '?opt=download_file&filename=' + encodeURIComponent(fileName);
+            };
+
+            document.getElementById('copyBtn').onclick = function() {
+                navigator.clipboard.writeText(fileContent)
+                    .then(() => {
+
+                    })
+                    .catch(err => alert("Failed to copy content: " + err));
+            };
+        });
+    </script>
+</head>
+<body>
+<div class="container">
+    <div id="fileName" data-file="{{.FileName}}"></div>
+    <div class="buttons">
+        <button id="deleteBtn">Delete</button>
+        <button id="downloadBtn">Download</button>
+        <button id="copyBtn">Copy</button>
+    </div>
+    <pre  id="fileContent">{{.Content}}</pre>
+</div>
+</body>
+</html>
