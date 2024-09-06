@@ -55,7 +55,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Failed to read file", http.StatusInternalServerError)
 				return
 			}
-			renderTemplate(w, info.Name(), string(content))
+			renderTemplate(w, info.Name(), string(content), info.Size())
 		}
 		return
 	}
@@ -110,7 +110,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func renderTemplate(w http.ResponseWriter, fileName, content string) {
+func renderTemplate(w http.ResponseWriter, fileName, content string, fileSize int64) {
 	tmpl, err := template.ParseFiles("file.html")
 	if err != nil {
 		http.Error(w, "Unable to parse template", http.StatusInternalServerError)
@@ -119,13 +119,34 @@ func renderTemplate(w http.ResponseWriter, fileName, content string) {
 	data := struct {
 		FileName string
 		Content  string
+		FileSize string
 	}{
 		FileName: fileName,
 		Content:  content,
+		FileSize: humanBytes(fileSize),
 	}
 	if err := tmpl.Execute(w, data); err != nil {
 		http.Error(w, "Unable to execute template", http.StatusInternalServerError)
 	}
+}
+
+func humanBytes(size int64) string {
+	kb, mb := bytesToKBMB(size)
+	if mb >= 1 {
+		return fmt.Sprintf("%0.2fMB", mb)
+	}
+
+	if kb >= 1 {
+		return fmt.Sprintf("%0.2fKB", kb)
+	}
+
+	return fmt.Sprintf("%d", size)
+}
+
+func bytesToKBMB(bytes int64) (float64, float64) {
+	kB := float64(bytes) / 1024
+	MB := kB / 1024
+	return kB, MB
 }
 
 func folderName(path string) string {
