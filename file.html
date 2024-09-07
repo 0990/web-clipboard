@@ -64,11 +64,15 @@
             };
 
             document.getElementById('copyBtn').onclick = function() {
-                navigator.clipboard.writeText(fileContent)
-                    .then(() => {
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(fileContent)
+                        .then(() => {
 
-                    })
-                    .catch(err => alert("Failed to copy content: " + err));
+                        })
+                        .catch(err => alert("Failed to copy content: " + err));
+                }else{
+                    alert("Clipboard API not supported in this browser");
+                }
             };
         });
     </script>

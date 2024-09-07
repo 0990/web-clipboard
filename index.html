@@ -14,23 +14,74 @@
             text-align: center;
         }
         .message {
-            font-size: 24px;
+            font-size: 70px;
             color: #333;
+        }
+        .buttons { margin-bottom: 2px; }
+        .buttons button {
+            font-size: 70px;
+            padding: 5px 15px;
+            margin-right: 5px;
+            cursor: pointer;
+            border: none;
+            border-radius: 20px;
+            background-color: #007bff;
+            color: white;
+        }
+        .buttons button:hover {
+            background-color: #0056b3;
         }
     </style>
 </head>
 <body>
-<div class="message">Ctrl+V or Drop file</div>
+<div class="buttons">
+    <button id="pasteBtn">Ctrl+V</button>
+</div>
+<div class="message">or Drop file</div>
+
 <script>
-    window.addEventListener('dragover', (event) => {
-        event.preventDefault();
+    console.log("1.14");
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    var dropzone = document.documentElement;
+    dropzone.addEventListener('dragover', (event) => {
+        preventDefaults(event);
+        dropzone.style.backgroundColor = '#f9f9f9';
     });
 
-    window.addEventListener('drop', (event) => {
-        event.preventDefault();
-        const files = event.dataTransfer.files;
-        uploadFile(files[0]);
+    dropzone.addEventListener('dragenter', function(event) {
+        preventDefaults(event);
     });
+
+    dropzone.addEventListener('dragleave', function(event) {
+        preventDefaults(event);
+        dropzone.style.backgroundColor = '#fff';
+    });
+
+    dropzone.addEventListener('drop', (event) => {
+        preventDefaults(event);
+        dropzone.style.backgroundColor = '#fff';
+        const files = event.dataTransfer.files;
+        if(files.length>0){
+            console.log(files);
+            uploadFile(files[0]);
+        }else{
+            const items = event.dataTransfer.items;
+            console.log(items);
+            alert("TODO event.dataTransfer.items")
+        }
+    });
+
+    function fallbackManualPaste() {
+        const manualInput = prompt('您的浏览器不支持直接粘贴，请手动粘贴内容:');
+        if (manualInput !== null) {
+            uploadString(manualInput);
+        }
+    }
 
     function getUrlPath(){
         const url = window.location.href;
@@ -79,6 +130,21 @@
                     uploadString(string);
                 });
             }
+        }
+    });
+
+    const pasteButton = document.getElementById('pasteBtn');
+    pasteButton.addEventListener('click', async () => {
+        try {
+            if (navigator.clipboard) {
+                const text = await navigator.clipboard.readText();
+                uploadString(text);
+            } else {
+                fallbackManualPaste();
+                //alert('您的浏览器不支持 clipboard API');
+            }
+        } catch (err) {
+            alert('无法粘贴内容', err);
         }
     });
 </script>
