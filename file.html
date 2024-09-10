@@ -37,12 +37,15 @@
         }
 
         function deleteFile(filename) {
+            const headers = new Headers();
+            headers.append("Option","delete_file");
+
             const formData = new FormData();
             formData.append('filename', filename);
-            formData.append('opt', "delete_file");
 
             fetch(getUrlPath(), {
                 method: 'POST',
+                headers:headers,
                 body: formData
             }).then(response => response.text())
                 .then(result => {
@@ -60,7 +63,7 @@
             };
 
             document.getElementById('downloadBtn').onclick = function() {
-                window.location.href = '?opt=download_file&filename=' + encodeURIComponent(fileName);
+                window.location.href = '?Option=download_file&filename=' + encodeURIComponent(fileName);
             };
 
             document.getElementById('copyBtn').onclick = function() {

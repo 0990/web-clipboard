@@ -17,7 +17,11 @@
             font-size: 70px;
             color: #333;
         }
-        .buttons { margin-bottom: 2px; }
+        .buttons {
+            margin-bottom: 2px;
+            display: flex;
+            align-items: center;
+        }
         .buttons button {
             font-size: 70px;
             padding: 5px 15px;
@@ -25,29 +29,88 @@
             cursor: pointer;
             border: none;
             border-radius: 20px;
-            background-color: #007bff;
+            background-color: #7AAFB5;
             color: white;
         }
         .buttons button:hover {
-            background-color: #0056b3;
+            background-color: #8ABDC3;
+        }
+        #progress-container {
+            display: none;
+            position: fixed;
+            top: 0;
+            left:0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5); /* 半透明背景 */
+            z-index: 9999;
+        }
+        #progress-bar {
+            width: 300px;
+            height: 20px;
+            background-color: #4caf50;
+            border-radius: 5px;
+            transition: width 0.3s;
+        }
+        #close-button {
+            margin-top: 10px;
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 10px 20px; /* 增加内边距 */
+            font-size: 16px; /* 增加字体大小 */
+            cursor: pointer;
+            border-radius: 5px;
         }
     </style>
 </head>
 <body>
 <div class="buttons">
     <button id="pasteBtn">Ctrl+V</button>
+    <div class="message">&nbsp;or&nbsp;</div>
+    <button id="dropBtn">Drop file</button>
 </div>
-<div class="message">or Drop file</div>
-
+<div id="progress-container">
+    <div id="progress-bar"></div>
+    <button id="close-button">Cancel</button>
+</div>
+<input type="file" id="fileInput" style="display: none;">
 <script>
     console.log("1.14");
+
+    const progressContainer = document.getElementById('progress-container');
+    const progressBar = document.getElementById('progress-bar');
+    const closeButton = document.getElementById('close-button');
+    const pasteButton = document.getElementById('pasteBtn');
+    const dropButton = document.getElementById('dropBtn');
+    var dropzone = document.documentElement;
+    let xhr;
+    let status="idle";
+
+    function setStatus(v){
+        status = v
+        switch (status){
+            case "idle":
+                progressContainer.style.display = 'none';
+                pasteButton.disabled=false;
+                dropButton.disabled=false;
+                break
+            case "uploading":
+                progressContainer.style.display = 'block';
+                progressBar.style.width = '0%'
+                pasteButton.disabled=true;
+                dropButton.disabled=true;
+                break
+            default:
+                break
+        }
+    }
 
     function preventDefaults(e) {
         e.preventDefault();
         e.stopPropagation();
     }
 
-    var dropzone = document.documentElement;
     dropzone.addEventListener('dragover', (event) => {
         preventDefaults(event);
         dropzone.style.backgroundColor = '#f9f9f9';
@@ -90,26 +153,51 @@
     }
 
     function uploadFile(file) {
+        setStatus("uploading");
+
+        xhr = new XMLHttpRequest();
+        xhr.open('POST', getUrlPath(), true);
+        xhr.setRequestHeader("Option","upload_file");
+
+        xhr.upload.addEventListener('progress', function(event) {
+            if (event.lengthComputable) {
+                if (event.lengthComputable) {
+                    const percentComplete = (event.loaded / event.total) * 100;
+                    progressBar.style.width = percentComplete + '%';
+                }
+            }
+        });
+
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                location.reload();
+            } else {
+                alert('Upload failed: ' + xhr.statusText);
+            }
+            setStatus("idle");
+        };
+
+        xhr.onerror = function() {
+            alert('Upload failed: An error occurred during the upload.');
+            setStatus("idle");
+        };
+
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('opt', "upload_file");
-
-        fetch(getUrlPath(), {
-            method: 'POST',
-            body: formData
-        }).then(response => response.text())
-            .then(result => location.reload())
-            .catch(error => alert('Upload failed'));
+        xhr.send(formData);
     }
 
     function uploadString(string) {
+        const headers = new Headers();
+        headers.append("Option","upload_string");
+
         const formData = new FormData();
         formData.append('string', string);
-        formData.append('opt', "upload_string");
 
         fetch(getUrlPath(), {
             method: 'POST',
-            body: formData
+            headers: headers,
+            body: formData,
         }).then(response => response.text())
             .then(result => {
                 location.reload();
@@ -133,7 +221,7 @@
         }
     });
 
-    const pasteButton = document.getElementById('pasteBtn');
+
     pasteButton.addEventListener('click', async () => {
         try {
             if (navigator.clipboard) {
@@ -141,11 +229,29 @@
                 uploadString(text);
             } else {
                 fallbackManualPaste();
-                //alert('您的浏览器不支持 clipboard API');
             }
         } catch (err) {
             alert('无法粘贴内容', err);
         }
+    });
+
+    dropButton.addEventListener('click', async () => {
+        document.getElementById('fileInput').click();
+    });
+
+    document.getElementById('fileInput').addEventListener('change', function() {
+        const fileInput = document.getElementById('fileInput');
+        if (fileInput.files.length === 0) {
+            return;
+        }
+        uploadFile(fileInput.files[0]);
+    });
+
+    closeButton.addEventListener('click', () => {
+        if (xhr && xhr.readyState !== 4) {
+            xhr.abort();
+        }
+        setStatus("idle");
     });
 </script>
 </body>

@@ -3,7 +3,7 @@ COPY . /workdir
 WORKDIR /workdir
 
 RUN go env -w GOPROXY="https://goproxy.cn,direct"
-RUN CGO_ENABLED=0 go build -o /bin/app ./main.go
+RUN CGO_ENABLED=0 go build -o /bin/app ./cmd/main.go
 
 FROM scratch as runner
 WORKDIR /app
