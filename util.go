@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 func createFile(folder string, fileName string, reader io.Reader) error {
@@ -45,19 +47,19 @@ func getFile(folder string) (path string, info os.FileInfo, ok bool) {
 	return
 }
 
-func readFile(file string, length int) (string, error) {
+func readFile(file string, length int) ([]byte, error) {
 	f, err := os.Open(file)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer f.Close()
 
 	var content []byte = make([]byte, length)
 	n, _ := io.ReadFull(f, content)
 	if n == length {
-		return string(content[:n]) + "\n" + "................." + "\n" + ".................", nil
+		return append(content[:n], []byte("\n.................\n.................")...), nil
 	}
-	return string(content[:n]), nil
+	return content[:n], nil
 }
 
 func downloadHandler(w http.ResponseWriter, r *http.Request, fileFolder, fileName string) {
@@ -110,4 +112,39 @@ func bytesToKBMB(bytes int64) (float64, float64) {
 	kB := float64(bytes) / 1024
 	MB := kB / 1024
 	return kB, MB
+}
+
+func isReadableRune(r rune) bool {
+	return unicode.IsPrint(r) || unicode.IsSpace(r)
+}
+
+func readableRatio(data []byte) float64 {
+	if len(data) == 0 {
+		return 0.0
+	}
+
+	readableCount := 0
+	totalRunes := 0
+	for len(data) > 0 {
+		r, size := utf8.DecodeRune(data)
+		if r == utf8.RuneError && size == 1 {
+			// Invalid UTF-8 encoding, skip this byte
+			data = data[1:]
+			totalRunes++
+			continue
+		}
+		if isReadableRune(r) {
+			readableCount++
+		} else {
+			fmt.Println(r)
+		}
+		totalRunes++
+		data = data[size:]
+	}
+
+	if totalRunes == 0 {
+		return 0.0
+	}
+
+	return float64(readableCount) / float64(totalRunes)
 }

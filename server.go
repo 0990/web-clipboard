@@ -1,6 +1,7 @@
 package webclipboard
 
 import (
+	"embed"
 	"fmt"
 	"html/template"
 	"io"
@@ -9,6 +10,9 @@ import (
 	"os"
 	"strings"
 )
+
+//go:embed html
+var assets embed.FS
 
 type Server struct {
 	showLength int
@@ -56,7 +60,13 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 	default:
 		path, info, exist := getFile(folderName)
 		if !exist {
-			http.ServeFile(w, r, "index.html")
+			data, err := assets.ReadFile("html/index.html")
+			if err != nil {
+				log.Println(err)
+				http.Error(w, "Failed to read file", http.StatusInternalServerError)
+				return
+			}
+			w.Write(data)
 			return
 		}
 		//浏览器的请求，展示file页面，非浏览器的请求，下载文件
@@ -65,6 +75,10 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				http.Error(w, "Failed to read file", http.StatusInternalServerError)
 				return
+			}
+			var radio = readableRatio(content)
+			if radio < 0.60 {
+				content = []byte("unreadable binary file")
 			}
 			renderTemplate(w, info.Name(), string(content), info.Size())
 		} else {
@@ -125,7 +139,7 @@ func (s *Server) handlePost(w http.ResponseWriter, r *http.Request) {
 }
 
 func renderTemplate(w http.ResponseWriter, fileName, content string, fileSize int64) {
-	tmpl, err := template.ParseFiles("file.html")
+	tmpl, err := template.ParseFS(assets, "html/file.html")
 	if err != nil {
 		http.Error(w, "Unable to parse template", http.StatusInternalServerError)
 		return
