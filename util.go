@@ -1,6 +1,7 @@
 package webclipboard
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -31,39 +32,54 @@ func createFile(folder string, fileName string, reader io.Reader) error {
 	return nil
 }
 
-func getFile(folder string) (path string, info os.FileInfo, ok bool) {
-	filepath.Walk(folder, func(path1 string, info1 os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info1.IsDir() {
-			path = path1
-			info = info1
-			ok = true
-		}
-		return nil
-	})
-
-	return
-}
-
-func readFile(file string, length int) ([]byte, error) {
-	f, err := os.Open(file)
+// 从目录中，找到一个文件返回
+func findOneFileFromDir(dir string) (path string, ok bool, err error) {
+	// 打开目录
+	f, err := os.Open(dir)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, os.ErrNotExist) {
+			return "", false, nil
+		}
+		return "", false, err
 	}
 	defer f.Close()
+
+	// 读取目录内容
+	files, err := f.Readdir(0)
+	if err != nil {
+		return "", false, err
+	}
+
+	// 遍历目录内容
+	for _, file := range files {
+		if !file.IsDir() {
+			return file.Name(), true, nil
+		}
+	}
+	return "", false, nil
+}
+
+func readFile(file string, length int) ([]byte, os.FileInfo, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
+		return nil, nil, err
+	}
 
 	var content []byte = make([]byte, length)
 	n, _ := io.ReadFull(f, content)
 	if n == length {
-		return append(content[:n], []byte("\n.................\n.................")...), nil
+		return append(content[:n], []byte("\n.................\n.................")...), info, nil
 	}
-	return content[:n], nil
+	return content[:n], info, nil
 }
 
-func downloadHandler(w http.ResponseWriter, r *http.Request, fileFolder, fileName string) {
-	var filePath = fileFolder + "/" + fileName
+func downloadHandler(w http.ResponseWriter, r *http.Request, filePath string) {
 	w.Header().Set("Content-Disposition", "attachment; filename="+filepath.Base(filePath))
 	http.ServeFile(w, r, filePath)
 }
@@ -147,4 +163,52 @@ func readableRatio(data []byte) float64 {
 	}
 
 	return float64(readableCount) / float64(totalRunes)
+}
+
+// 判断文件是否存在
+func isFileExists(filename string) bool {
+	// 使用 os.Stat 获取文件信息
+	info, err := os.Stat(filename)
+	// 如果 err 为 nil，表示文件存在
+	if err != nil {
+		return false
+	}
+
+	if info.IsDir() {
+		return false
+	}
+	return true
+}
+
+func deleteDirIfHasNoFile(dir string) error {
+	has, err := hasFileDirInDirectory(dir)
+	if err != nil {
+		return err
+	}
+	if has {
+		return nil
+	}
+
+	return os.RemoveAll(dir)
+}
+
+func hasFileDirInDirectory(dir string) (bool, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false, err
+	}
+	return len(entries) > 0, nil
+}
+
+func fileType(name string) string {
+	// 获取文件扩展名
+	ext := filepath.Ext(name)
+	switch ext {
+	case ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp":
+		return "image"
+	case ".txt", ".log":
+		return "text"
+	default:
+		return "unknow"
+	}
 }

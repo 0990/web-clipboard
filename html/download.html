@@ -13,11 +13,11 @@
             cursor: pointer;
             border: none;
             border-radius: 5px;
-            background-color: #007bff;
+            background-color: #6b8da8;
             color: white;
         }
         .buttons button:hover {
-            background-color: #0056b3;
+            background-color: #6b8dc9;
         }
         pre {
             font-size: 16px;
@@ -27,6 +27,12 @@
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 5px;
+        }
+        .image-container {
+            border: 1px solid #000; /* 边框颜色和宽度 */
+            padding: 10px;          /* 内边距 */
+            margin: 10px 0;        /* 外边距 */
+            display: inline-block;  /* 使容器适应内容 */
         }
     </style>
     <script>
@@ -56,23 +62,24 @@
 
         document.addEventListener("DOMContentLoaded", function() {
             const fileName = document.getElementById('fileName').getAttribute('data-file');
-            const fileContent = document.getElementById('fileContent').textContent;
 
             document.getElementById('deleteBtn').onclick = function() {
-                deleteFile(fileName)
+                deleteFile('{{.FileName}}')
             };
 
             document.getElementById('downloadBtn').onclick = function() {
-                window.location.href = '?Option=download_file&filename=' + encodeURIComponent(fileName);
+                window.location.href = '{{.FilePath}}';
             };
 
             document.getElementById('copyBtn').onclick = function() {
                 if (navigator.clipboard) {
-                    navigator.clipboard.writeText(fileContent)
-                        .then(() => {
-
-                        })
-                        .catch(err => alert("Failed to copy content: " + err));
+                    const ele = document.getElementById('fileContent');
+                    if(ele){
+                        navigator.clipboard.writeText(ele.textContent).then(() => {
+                        }).catch(err => alert("Failed to copy content: " + err));
+                    }else{
+                        alert("no fileContent");
+                    }
                 }else{
                     alert("Clipboard API not supported in this browser");
                 }
@@ -89,7 +96,13 @@
         <button id="copyBtn">Copy</button>
         <label>{{.FileName}}_{{.FileSize}} </label>
     </div>
-    <pre  id="fileContent">{{.Content}}</pre>
+    {{if eq .FileType "image"}}
+        <div class="image-container">
+            <img src="{{.FilePath}}"><br/>
+        </div>
+    {{else}}
+        <pre  id="fileContent">{{.Content}}</pre>
+    {{end}}
 </div>
 </body>
 </html>

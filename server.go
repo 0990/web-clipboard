@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -50,45 +51,58 @@ func (s *Server) handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
-	folderName := folderName(s.fileDir, r.URL.Path)
-	var opt = r.FormValue("Option")
-	switch opt {
-	case "download_file":
-		var filename = r.FormValue("filename")
-		downloadHandler(w, r, folderName, filename)
+	subPath := makePath(r.URL.Path)
+	fullPath := filepath.Join(s.fileDir, subPath)
+
+	//如果能直接访问到文件地址，则直接下载文件
+	if isFileExists(fullPath) {
+		downloadHandler(w, r, fullPath)
 		return
-	default:
-		path, info, exist := getFile(folderName)
-		if !exist {
-			data, err := assets.ReadFile("html/index.html")
-			if err != nil {
-				log.Println(err)
-				http.Error(w, "Failed to read file", http.StatusInternalServerError)
-				return
-			}
-			w.Write(data)
+	}
+
+	//看目录下是否有文件
+	filename, exist, err := findOneFileFromDir(fullPath)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to read file", http.StatusInternalServerError)
+		return
+	}
+
+	//文件不存在，则展示"上传页面"
+	if !exist {
+		data, err := assets.ReadFile("html/upload.html")
+		if err != nil {
+			log.Println(err)
+			http.Error(w, "Failed to read file", http.StatusInternalServerError)
 			return
 		}
-		//浏览器的请求，展示file页面，非浏览器的请求，下载文件
-		if isRequestFromMozilla(r.Header.Get("User-Agent")) {
-			content, err := readFile(path, s.showLength)
-			if err != nil {
-				http.Error(w, "Failed to read file", http.StatusInternalServerError)
-				return
-			}
-			var radio = readableRatio(content)
-			if radio < 0.60 {
-				content = []byte("unreadable binary file")
-			}
-			renderTemplate(w, info.Name(), string(content), info.Size())
-		} else {
-			downloadHandler(w, r, folderName, info.Name())
-		}
+		w.Write(data)
+		return
 	}
+
+	newPath := filepath.Join(fullPath, filename)
+	//非浏览器的请求，则直接下载文件
+	if !isRequestFromMozilla(r.Header.Get("User-Agent")) {
+		downloadHandler(w, r, newPath)
+		return
+	}
+
+	//浏览器的请求，展示下载页面
+	content, fileInfo, err := readFile(newPath, s.showLength)
+	if err != nil {
+		http.Error(w, "Failed to read file", http.StatusInternalServerError)
+		return
+	}
+	var radio = readableRatio(content)
+	if radio < 0.60 {
+		content = []byte("unreadable binary file")
+	}
+	renderDownloadPage(w, filepath.Join(subPath, filename), string(content), fileInfo.Size())
 }
 
 func (s *Server) handlePost(w http.ResponseWriter, r *http.Request) {
-	folderName := folderName(s.fileDir, r.URL.Path)
+	subPath := makePath(r.URL.Path)
+	fullPath := filepath.Join(s.fileDir, subPath)
 	var opt = r.Header.Get("Option")
 
 	switch opt {
@@ -106,7 +120,7 @@ func (s *Server) handlePost(w http.ResponseWriter, r *http.Request) {
 		fileName = header.Filename
 		content = file
 		log.Println("createFile start", fileName)
-		err = createFile(folderName, fileName, content)
+		err = createFile(fullPath, fileName, content)
 		if err != nil {
 			log.Println("createFile failed", err)
 			http.Error(w, "Failed to save file", http.StatusInternalServerError)
@@ -121,16 +135,22 @@ func (s *Server) handlePost(w http.ResponseWriter, r *http.Request) {
 		fileName = "noname.txt"
 		str := r.FormValue("string")
 		content = strings.NewReader(str)
-		err := createFile(folderName, fileName, content)
+		err := createFile(fullPath, fileName, content)
 		if err != nil {
 			http.Error(w, "Failed to save file", http.StatusInternalServerError)
 			return
 		}
 		w.Write([]byte("File uploaded successfully"))
 	case "delete_file":
-		err := os.RemoveAll(folderName)
+		filename := r.FormValue("filename")
+		err := os.Remove(filepath.Join(fullPath, filename))
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Failed to delete file:%s", err), http.StatusInternalServerError)
+			return
+		}
+		err = deleteDirIfHasNoFile(fullPath)
+		if err != nil {
+			log.Println("deleteDirIfHasNoFile failed", err)
 			return
 		}
 	default:
@@ -138,8 +158,8 @@ func (s *Server) handlePost(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func renderTemplate(w http.ResponseWriter, fileName, content string, fileSize int64) {
-	tmpl, err := template.ParseFS(assets, "html/file.html")
+func renderDownloadPage(w http.ResponseWriter, filePath, content string, fileSize int64) {
+	tmpl, err := template.ParseFS(assets, "html/download.html")
 	if err != nil {
 		http.Error(w, "Unable to parse template", http.StatusInternalServerError)
 		return
@@ -148,23 +168,24 @@ func renderTemplate(w http.ResponseWriter, fileName, content string, fileSize in
 		FileName string
 		Content  string
 		FileSize string
+		FilePath string
+		FileType string
 	}{
-		FileName: fileName,
+		FileName: filepath.Base(filePath),
 		Content:  content,
 		FileSize: humanBytes(fileSize),
+		FilePath: filePath,
+		FileType: fileType(filePath),
 	}
 	if err := tmpl.Execute(w, data); err != nil {
 		http.Error(w, "Unable to execute template", http.StatusInternalServerError)
 	}
 }
 
-func folderName(dir string, path string) string {
-	var dir1 = dir
-	var dir2 = "root"
-
-	if path = strings.TrimPrefix(path, "/"); len(path) > 0 {
-		dir2 = path
+func makePath(urlPath string) (subPath string) {
+	if path := strings.TrimPrefix(urlPath, "/"); len(path) > 0 {
+		return path
 	}
 
-	return dir1 + "/" + dir2
+	return ""
 }
