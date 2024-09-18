@@ -43,16 +43,8 @@
         }
 
         function deleteFile(filename) {
-            const headers = new Headers();
-            headers.append("Option","delete_file");
-
-            const formData = new FormData();
-            formData.append('filename', filename);
-
             fetch(getUrlPath(), {
-                method: 'POST',
-                headers:headers,
-                body: formData
+                method: 'DELETE',
             }).then(response => response.text())
                 .then(result => {
                     location.reload();

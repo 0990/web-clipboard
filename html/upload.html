@@ -157,8 +157,6 @@
 
         xhr = new XMLHttpRequest();
         xhr.open('POST', getUrlPath(), true);
-        xhr.setRequestHeader("Option","upload_file");
-
         xhr.upload.addEventListener('progress', function(event) {
             if (event.lengthComputable) {
                 if (event.lengthComputable) {
@@ -188,16 +186,9 @@
     }
 
     function uploadString(string) {
-        const headers = new Headers();
-        headers.append("Option","upload_string");
-
-        const formData = new FormData();
-        formData.append('string', string);
-
         fetch(getUrlPath(), {
             method: 'POST',
-            headers: headers,
-            body: formData,
+            body: string,
         }).then(response => response.text())
             .then(result => {
                 location.reload();

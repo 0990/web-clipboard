@@ -2,12 +2,11 @@ package webclipboard
 
 import (
 	"embed"
-	"fmt"
+	"errors"
 	"html/template"
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 )
@@ -44,7 +43,33 @@ func (s *Server) handler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		s.handleGet(w, r)
 	case http.MethodPost:
-		s.handlePost(w, r)
+		err := s.handlePost(w, r)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Write([]byte("upload successfully\n"))
+		log.Println("upload success")
+	case http.MethodDelete:
+		err := s.handleDelete(w, r)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Write([]byte("delete successfully\n"))
+		log.Println("delete success")
+	case http.MethodPut:
+		err := s.handlePut(w, r)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Write([]byte("put successfully\n"))
+		log.Println("put success")
 	default:
 
 	}
@@ -68,8 +93,14 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	isFromMozilla := isRequestFromMozilla(r.Header.Get("User-Agent"))
+
 	//文件不存在，则展示"上传页面"
 	if !exist {
+		if !isFromMozilla {
+			return
+		}
+
 		data, err := assets.ReadFile("html/upload.html")
 		if err != nil {
 			log.Println(err)
@@ -82,7 +113,7 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 
 	newPath := filepath.Join(fullPath, filename)
 	//非浏览器的请求，则直接下载文件
-	if !isRequestFromMozilla(r.Header.Get("User-Agent")) {
+	if !isFromMozilla {
 		downloadHandler(w, r, newPath)
 		return
 	}
@@ -100,21 +131,18 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 	renderDownloadPage(w, filepath.Join(subPath, filename), string(content), fileInfo.Size())
 }
 
-func (s *Server) handlePost(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handlePost(w http.ResponseWriter, r *http.Request) error {
 	subPath := makePath(r.URL.Path)
 	fullPath := filepath.Join(s.fileDir, subPath)
-	var opt = r.Header.Get("Option")
 
-	switch opt {
-	case "upload_file":
+	//文件上传
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
 		var fileName string
 		var content io.Reader
 		log.Println("FormFile start")
 		file, header, err := r.FormFile("file")
 		if err != nil {
-			log.Println("formfile fail", err)
-			http.Error(w, "Failed to get file", http.StatusBadRequest)
-			return
+			return err
 		}
 		defer file.Close()
 		fileName = header.Filename
@@ -122,40 +150,47 @@ func (s *Server) handlePost(w http.ResponseWriter, r *http.Request) {
 		log.Println("createFile start", fileName)
 		err = createFile(fullPath, fileName, content)
 		if err != nil {
-			log.Println("createFile failed", err)
-			http.Error(w, "Failed to save file", http.StatusInternalServerError)
-			return
+			return err
 		}
-
-		w.Write([]byte("File uploaded successfully"))
-		log.Println("File uploaded success", fileName)
-	case "upload_string":
-		var fileName string
-		var content io.Reader
-		fileName = "noname.txt"
-		str := r.FormValue("string")
-		content = strings.NewReader(str)
-		err := createFile(fullPath, fileName, content)
-		if err != nil {
-			http.Error(w, "Failed to save file", http.StatusInternalServerError)
-			return
-		}
-		w.Write([]byte("File uploaded successfully"))
-	case "delete_file":
-		filename := r.FormValue("filename")
-		err := os.Remove(filepath.Join(fullPath, filename))
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to delete file:%s", err), http.StatusInternalServerError)
-			return
-		}
-		err = deleteDirIfHasNoFile(fullPath)
-		if err != nil {
-			log.Println("deleteDirIfHasNoFile failed", err)
-			return
-		}
-	default:
-		http.Error(w, "Invalid option", http.StatusBadRequest)
+		return nil
 	}
+
+	//body上传
+	err := createFile(fullPath, "default.txt", r.Body)
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+	return nil
+}
+
+func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) error {
+	subPath := makePath(r.URL.Path)
+	fullPath := filepath.Join(s.fileDir, subPath)
+	err := deleteFilesInDir(fullPath)
+	if err != nil {
+		return err
+	}
+	err = deleteDirIfHasNoEntry(fullPath)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// 只处理curl -T file.txt http://example.com 命令时，实际的 HTTP PUT 请求通常会将文件上传到指定的路径。具体来说，如果没有指定路径，curl 会将文件名附加到 URL上
+func (s *Server) handlePut(w http.ResponseWriter, r *http.Request) error {
+	filename := makePath(r.URL.Path)
+	if strings.Contains(filename, "/") {
+		return errors.New("multi dir not support in method put")
+	}
+
+	err := createFile(s.fileDir, filename, r.Body)
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+	return nil
 }
 
 func renderDownloadPage(w http.ResponseWriter, filePath, content string, fileSize int64) {

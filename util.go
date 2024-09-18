@@ -180,7 +180,8 @@ func isFileExists(filename string) bool {
 	return true
 }
 
-func deleteDirIfHasNoFile(dir string) error {
+// 空目录，则删除此目录
+func deleteDirIfHasNoEntry(dir string) error {
 	has, err := hasFileDirInDirectory(dir)
 	if err != nil {
 		return err
@@ -211,4 +212,23 @@ func fileType(name string) string {
 	default:
 		return "unknow"
 	}
+}
+
+func deleteFilesInDir(dir string) error {
+	// 读取目录下的所有内容
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		// 只删除文件
+		if !entry.IsDir() {
+			err := os.Remove(filepath.Join(dir, entry.Name()))
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
