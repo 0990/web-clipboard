@@ -171,7 +171,7 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	err = deleteDirIfHasNoEntry(fullPath)
+	err = deleteDirIfEmpty(fullPath)
 	if err != nil {
 		return err
 	}

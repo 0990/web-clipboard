@@ -181,24 +181,54 @@ func isFileExists(filename string) bool {
 }
 
 // 空目录，则删除此目录
-func deleteDirIfHasNoEntry(dir string) error {
-	has, err := hasFileDirInDirectory(dir)
+func deleteDirIfEmpty(dir string) error {
+	isEmpty, err := isEmptyDir(dir)
 	if err != nil {
 		return err
 	}
-	if has {
-		return nil
+	if isEmpty {
+		return os.RemoveAll(dir)
 	}
 
-	return os.RemoveAll(dir)
+	return nil
 }
 
-func hasFileDirInDirectory(dir string) (bool, error) {
-	entries, err := os.ReadDir(dir)
+func isEmptyDir(dir string) (bool, error) {
+	// 尝试打开目录
+	d, err := os.Open(dir)
 	if err != nil {
 		return false, err
 	}
-	return len(entries) > 0, nil
+	defer d.Close()
+
+	// 读取目录中的文件
+	entries, err := d.Readdir(-1) // 读取所有文件
+	if err != nil {
+		return false, err
+	}
+
+	// 遍历每个文件
+	for _, entry := range entries {
+		// 如果是文件，返回 false
+		if !entry.IsDir() {
+			return false, nil
+		}
+		// 如果是目录，递归检查
+		if entry.IsDir() {
+			subDir := filepath.Join(dir, entry.Name())
+			isEmpty, err := isEmptyDir(subDir)
+			if err != nil {
+				return false, err
+			}
+			// 如果子目录不为空，返回 false
+			if !isEmpty {
+				return false, nil
+			}
+		}
+	}
+
+	// 如果没有文件和非空子目录，返回 true
+	return true, nil
 }
 
 func fileType(name string) string {
