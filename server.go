@@ -210,7 +210,7 @@ func renderDownloadPage(w http.ResponseWriter, filePath, content string, fileSiz
 		Content:  content,
 		FileSize: humanBytes(fileSize),
 		FilePath: filePath,
-		FileType: fileType(filePath),
+		FileType: fileType(filePath, content),
 	}
 	if err := tmpl.Execute(w, data); err != nil {
 		http.Error(w, "Unable to execute template", http.StatusInternalServerError)

@@ -65,13 +65,14 @@
 
             document.getElementById('copyBtn').onclick = function() {
                 if (navigator.clipboard) {
-                    const ele = document.getElementById('fileContent');
-                    if(ele){
-                        navigator.clipboard.writeText(ele.textContent).then(() => {
+                    //const ele = document.getElementById('fileContent');
+                    //if(ele){
+                        const content = '{{.Content}}'
+                        navigator.clipboard.writeText(content).then(() => {
                         }).catch(err => alert("Failed to copy content: " + err));
-                    }else{
-                        alert("no fileContent");
-                    }
+                   // }else{
+                     //   alert("no fileContent");
+                  //  }
                 }else{
                     alert("Clipboard API not supported in this browser");
                 }
@@ -92,6 +93,8 @@
         <div class="image-container">
             <img src="{{.FilePath}}"><br/>
         </div>
+    {{else if eq .FileType "url"}}
+    <pre><a href="{{.Content}}" target="_blank">{{.Content}}</a></pre>
     {{else}}
         <pre  id="fileContent">{{.Content}}</pre>
     {{end}}

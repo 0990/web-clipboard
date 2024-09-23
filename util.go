@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -231,7 +232,11 @@ func isEmptyDir(dir string) (bool, error) {
 	return true, nil
 }
 
-func fileType(name string) string {
+func fileType(name string, content string) string {
+	if isValidURL(content) {
+		return "url"
+	}
+
 	// 获取文件扩展名
 	ext := filepath.Ext(name)
 	switch ext {
@@ -261,4 +266,16 @@ func deleteFilesInDir(dir string) error {
 		}
 	}
 	return nil
+}
+
+func wrapURL(url string) string {
+	if isValidURL(url) {
+		return fmt.Sprintf(`<a href="%s">%s</a>`, url, url)
+	}
+	return url
+}
+
+func isValidURL(str string) bool {
+	_, err := url.ParseRequestURI(str)
+	return err == nil
 }
