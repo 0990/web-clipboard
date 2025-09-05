@@ -75,8 +75,28 @@ func (s *Server) handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) tryHandleFaviconRequest(subPath string, w http.ResponseWriter, r *http.Request) bool {
+	switch subPath {
+	case "favicon.ico", "favicon.png", "favicon.svg":
+		data, err := assets.ReadFile("html/" + subPath)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, "Failed to read file", http.StatusInternalServerError)
+			return true
+		}
+		w.Write(data)
+		return true
+	default:
+		return false
+	}
+}
+
 func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 	subPath := makePath(r.URL.Path)
+	if s.tryHandleFaviconRequest(subPath, w, r) {
+		return
+	}
+
 	fullPath := filepath.Join(s.fileDir, subPath)
 
 	//如果能直接访问到文件地址，则直接下载文件
