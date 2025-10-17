@@ -82,6 +82,9 @@ func readFile(file string, length int) ([]byte, os.FileInfo, error) {
 
 func downloadHandler(w http.ResponseWriter, r *http.Request, filePath string) {
 	w.Header().Set("Content-Disposition", "attachment; filename="+filepath.Base(filePath))
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
 	http.ServeFile(w, r, filePath)
 }
 
