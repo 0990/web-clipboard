@@ -140,52 +140,11 @@
         }
     });
 
-    // function fallbackManualPaste() {
-    //     const manualInput = prompt('您的浏览器不支持直接粘贴，请手动粘贴内容:');
-    //     if (manualInput !== null) {
-    //         uploadString(manualInput);
-    //     }
-    // }
-
     function fallbackManualPaste() {
-        const ta = document.createElement('textarea');
-        ta.style.cssText = `
-        position: fixed;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%);
-        width: 80%;
-        height: 120px;
-        z-index:9999;
-        background:#fff;
-        font-size:16px;
-    `;
-        ta.placeholder = '在这里“粘贴”';
-
-        // 用户粘贴后自动提交
-        ta.addEventListener('paste', (e) => {
-            let text = '';
-
-            if (e.clipboardData) {
-                text = e.clipboardData.getData('text');
-            }
-
-            // 延迟读取一次，以兼容部分 iOS 行为
-            setTimeout(() => {
-                if (!text) text = ta.value;  // 保险方案
-
-                if (text.trim() !== '') {
-                    uploadString(text.trim());
-                }
-
-                document.body.removeChild(ta);
-            }, 10);
-        });
-
-        document.body.appendChild(ta);
-
-        // 必须 focus，iOS 才能弹出“粘贴”菜单
-        ta.focus();
+        const manualInput = prompt('您的浏览器不支持直接粘贴，请手动在此粘贴内容:');
+        if (manualInput !== null) {
+            uploadString(manualInput);
+        }
     }
 
 
