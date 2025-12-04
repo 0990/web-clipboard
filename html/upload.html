@@ -140,11 +140,28 @@
         }
     });
 
+    // function fallbackManualPaste() {
+    //     const manualInput = prompt('您的浏览器不支持直接粘贴，请手动粘贴内容:');
+    //     if (manualInput !== null) {
+    //         uploadString(manualInput);
+    //     }
+    // }
+
     function fallbackManualPaste() {
-        const manualInput = prompt('您的浏览器不支持直接粘贴，请手动粘贴内容:');
-        if (manualInput !== null) {
-            uploadString(manualInput);
-        }
+        const ta = document.createElement('textarea');
+        ta.style.position = 'absolute';
+        ta.style.opacity = 0;
+        document.body.appendChild(ta);
+
+        ta.focus();
+        ta.select(); // triggers “Paste” menu on iOS
+
+        alert("Please paste your content now.");
+
+        setTimeout(() => {
+            uploadString(ta.value);
+            document.body.removeChild(ta);
+        }, 200);
     }
 
     function getUrlPath(){
