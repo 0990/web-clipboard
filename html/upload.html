@@ -149,20 +149,45 @@
 
     function fallbackManualPaste() {
         const ta = document.createElement('textarea');
-        ta.style.position = 'absolute';
-        ta.style.opacity = 0;
+        ta.style.cssText = `
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        height: 120px;
+        z-index:9999;
+        background:#fff;
+        font-size:16px;
+    `;
+        ta.placeholder = '在这里“粘贴”';
+
+        // 用户粘贴后自动提交
+        ta.addEventListener('paste', (e) => {
+            let text = '';
+
+            if (e.clipboardData) {
+                text = e.clipboardData.getData('text');
+            }
+
+            // 延迟读取一次，以兼容部分 iOS 行为
+            setTimeout(() => {
+                if (!text) text = ta.value;  // 保险方案
+
+                if (text.trim() !== '') {
+                    uploadString(text.trim());
+                }
+
+                document.body.removeChild(ta);
+            }, 10);
+        });
+
         document.body.appendChild(ta);
 
+        // 必须 focus，iOS 才能弹出“粘贴”菜单
         ta.focus();
-        ta.select(); // triggers “Paste” menu on iOS
-
-        alert("Please paste your content now.");
-
-        setTimeout(() => {
-            uploadString(ta.value);
-            document.body.removeChild(ta);
-        }, 200);
     }
+
 
     function getUrlPath(){
         const url = window.location.href;
